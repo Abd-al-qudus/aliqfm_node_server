@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const bcrypt = require('bcrypt');
+
 
 const UserSchema = new mongoose.Schema({
   method: {
@@ -14,8 +14,7 @@ const UserSchema = new mongoose.Schema({
       },
       email: {
         type: String,
-        unique: true,
-        lowercase: true
+        lowercase: true,
       },
     password: String
   },
@@ -26,12 +25,12 @@ const UserSchema = new mongoose.Schema({
       },
       email: {
         type: String,
-        unique: true,
-        lowercase: true
+        lowercase: true,
       },
   },
   common: {
     refreshToken: String,
+    verified: Boolean,
     roles: {
       User: {
         type: Number,
@@ -42,4 +41,6 @@ const UserSchema = new mongoose.Schema({
   }
 });
 
-module.exports = mongoose.model('User', UserSchema);
+const user = mongoose.model('User', UserSchema)
+
+module.exports = user;
