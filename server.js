@@ -14,9 +14,9 @@ dotenv.config()
 const port = process.env.PORT || 3500
 server = express();
 server.use(requestLogger);
+server.use(express.json());
 server.use(cookieParser());
 server.use(cors());
-server.use(express.json());
 server.use(bodyparser.urlencoded({
   extended: true
 }));

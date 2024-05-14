@@ -30,7 +30,13 @@ const UserSchema = new mongoose.Schema({
   },
   common: {
     refreshToken: String,
-    verified: Boolean,
+    verified: {
+      type: Boolean,
+      default: false
+    },
+    mobile: String,
+    firstName: String,
+    lastName: String,
     roles: {
       User: {
         type: Number,
@@ -40,6 +46,7 @@ const UserSchema = new mongoose.Schema({
     }
   }
 });
+
 
 const user = mongoose.model('User', UserSchema)
 

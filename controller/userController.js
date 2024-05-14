@@ -1,6 +1,7 @@
 const User = require('../models/user.model');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const otpGenerator = require('otp-generator');
 const { generateJWTAccess, generateJWTRefresh } = require('../utils/generateJWT');
 
 
@@ -113,4 +114,71 @@ const refreshAccessToken = async (req, res) => {
   }
 }
 
-module.exports = { register, login, logout, refreshAccessToken };
+
+const generateOTP = async (req, res) => {
+  const OTP = await otpGenerator.generate(8, { lowerCaseAlphabets: false, upperCaseAlphabets: true, specialChars: false });
+  req.app.locals.OTP = OTP;
+  return res.status(201).json({ OTP });
+}
+
+
+const verifyOTP = async (req, res) => {
+  const { email, OTP } = req.query;
+  if (!OTP || !email) return res.sendStatus(400);
+  if (String(OTP) !== String(req.app.locals.OTP)) return res.sendStatus(400);
+  try {
+    const user = await User.findOne({ 'local.email': email }).exec();
+    if (!user) return res.status(404).json({ 'error': 'user does not exist' });
+    if (user.common.verified) {
+      req.app.locals.OTP = null;
+      req.app.locals.reset = true;
+      return res.status(400).json({ 'message': 'user already verified' });
+    }
+    req.app.locals.OTP = null;
+    req.app.locals.reset = true;
+    user.common.verified = true;
+    await user.save();
+    return res.status(200).json({ 'message': 'OTP verified successfully' });
+  } catch (error) {
+    return res.status(500).json({ error });
+  }
+}
+
+
+const resetPassword = async (req, res) => {
+  if (!req.app.locals.reset) return res.status(404).json({ 'error': 'auth session expired' });
+  const { email, newPassword} = req.body;
+  if (!newPassword || !email) return res.status(400).json({ 'error': 'missing email or password' });
+  if (typeof email !== "string") return res.status(400).json({error: "email must be a string"});
+  if (typeof newPassword !== "string") return res.status(400).json({error: "password must be a string"});
+  try {
+    const user = await User.findOne({ 'local.email': email }).exec();
+    if (!user) return res.status(404).json({ 'error': 'user does not exist' });
+      const newpwd = await bcrypt.hash(newPassword, 10);
+      user.local.password = newpwd;
+      await user.save();
+      req.app.locals.reset = false;
+      return res.status(200).json({ 'message': 'user password changed' });
+  } catch (error) {
+    return res.status(500).json({ error });
+  }
+}
+
+
+const resetSession = async (req, res) => {
+  if (req.app.locals.reset){
+    req.app.locals.reset = false;
+    return res.status(201).json({ 'message': 'session reseted' });
+  }
+  return res.status(440).json({ 'error': 'sesssion expired' });
+}
+
+
+module.exports = { register, 
+                    login, 
+                    logout, 
+                    refreshAccessToken, 
+                    generateOTP, 
+                    verifyOTP, 
+                    resetPassword,
+                    resetSession };

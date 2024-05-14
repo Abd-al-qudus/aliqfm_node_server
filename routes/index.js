@@ -1,11 +1,19 @@
 const express = require('express');
-const verifyJWT = require('../middlewares/verifyJWT');
-const { register, login, logout, refreshAccessToken } = require('../controller/userController');
+const emailRegistration = require('../configs/emailSMTPConfig');
+const verifyJsonWebToken = require('../middlewares/verifyJWT');
+const { register, 
+        login, 
+        logout, 
+        refreshAccessToken, 
+        generateOTP, 
+        verifyOTP, 
+        resetPassword,
+        resetSession } = require('../controller/userController');
 
 
 const router = express.Router();
 
-router.get('/', verifyJWT, (req, res) => {
+router.get('/', verifyJsonWebToken, (req, res) => {
   return res.status(200).json({
     status: 200,
     message: "success"
@@ -13,9 +21,16 @@ router.get('/', verifyJWT, (req, res) => {
 })
 
 router.post('/api/auth/create', register);
-router.post('/api/auth', login);
-router.get('/api/auth', logout);
+router.route('/api/auth')
+            .post(login)
+            .get(logout);
+            
 router.get('/api/auth/refresh', refreshAccessToken);
+router.get('/api/auth/otp', generateOTP);
+router.get('/api/auth/verify-otp', verifyOTP);
+router.put('/api/auth/reset-password',resetPassword);
+router.get('/api/auth/reset-session',resetSession);
+router.post('/api/auth/email', emailRegistration);
 
 
 module.exports = router;
