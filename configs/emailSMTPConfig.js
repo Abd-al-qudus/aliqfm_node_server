@@ -23,21 +23,24 @@ const emailRegistration = async (req, res) => {
     }
   });
   try {
-    const { email, subject } = req.body;
-    if (typeof email !== "string" || typeof subject !== "string") return res.sendStatus(403);
+    const OTP = req.app.locals.OTP;
+    const email = req.user.email;
+    const subject  = req.query.subject;
+    console.log(OTP, query)
+    if (typeof subject !== "string" || typeof email !== "string") return res.sendStatus(403);
     if (!email || !subject) return res.status(400).json({ 'error': 'missing email or subject' });
     const mail = {
       body: {
       name: email,
-      intro: "Welcome to Al-Iqmah",
-      outro: "This email is automatically generated and will not be responded to"
+      intro: OTP ? ['Welcome to Al-Iqmah!!!', `your OTP is ${OTP}`] : ['Welcome to Al-Iqmah!!!', 'your registration has been completed successfully.'],
+      outro: "This email is automatically generated upon user verification."
       }
     }
     const body = await mailGen.generate(mail);
     const message = {
       from: process.env.SMTP_EMAIL,
       to: email,
-      subject: subject || "Your registration on Al-Iqmah has been completed",
+      subject: subject,
       html: body
     }
     await transporter.sendMail(message);

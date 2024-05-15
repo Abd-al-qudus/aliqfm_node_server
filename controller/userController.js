@@ -2,8 +2,13 @@ const User = require('../models/user.model');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const otpGenerator = require('otp-generator');
+const nodemailer = require('nodemailer');
+const mailGenerator = require('mailgen');
+const dotenv = require('dotenv');
 const { generateJWTAccess, generateJWTRefresh } = require('../utils/generateJWT');
 
+
+dotenv.config();
 
 const register = async (req, res) => {
   const { email, password } = req.body;
@@ -12,8 +17,16 @@ const register = async (req, res) => {
   if (!email) return res.status(400).json({error: "email is empty"});
   if (!password) return res.status(400).json({error: "password is empty"});
   try {
-    const existingUser = await User.findOne({ "local.email": email }).exec();
-    if (existingUser) return res.status(409).json({ error: "user already exist" });
+    const existingUser = await User.findOne({
+      $or: [
+        { "local.email": email },
+        { "google.email": email }
+      ]
+    }).exec();
+    if (existingUser) {
+      if (existingUser.common.verified) return res.status(409).json({ error: "user already exist" });
+      return res.redirect(`/api/auth/otp?email=${email}`);
+    }
     const hashed_password = await bcrypt.hash(password, 10);
     const newUser = User({
       method: 'local',
@@ -23,7 +36,7 @@ const register = async (req, res) => {
       }
     });
     await newUser.save();
-    return res.status(201).json({ status: 201, message: "user created"});
+    return res.redirect(`/api/auth/otp?email=${email}`);
   } catch(error){
     return res.status(500).json({
       status: 500, 
@@ -118,7 +131,45 @@ const refreshAccessToken = async (req, res) => {
 const generateOTP = async (req, res) => {
   const OTP = await otpGenerator.generate(8, { lowerCaseAlphabets: false, upperCaseAlphabets: true, specialChars: false });
   req.app.locals.OTP = OTP;
-  return res.status(201).json({ OTP });
+  const smtpConfig = {
+    host: process.env.SMTP_HOST,
+    port: process.env.SMTP_PORT,
+    secure: false,
+    auth: {
+        user: process.env.SMTP_EMAIL,
+        pass: process.env.SMTP_PASSWORD
+    }
+  }
+  const transporter = nodemailer.createTransport(smtpConfig);
+  const mailGen = new mailGenerator({
+  theme: "default",
+  product: {
+    name: "MailGen",
+    link: "https://mailgen.js"
+  }
+  });
+  try {
+    const email = req.user ? req.user.email : req.query.email;
+    const mail = {
+      body: {
+      name: email,
+      intro: ['Welcome to Al-Iqmah!!!', `your OTP is ${OTP}`],
+      outro: "This email is automatically generated upon user verification."
+      }
+    }
+    const body = await mailGen.generate(mail);
+    const message = {
+      from: process.env.SMTP_EMAIL,
+      to: email,
+      subject: "Al-Iqmah OTP Generator",
+      html: body
+    }
+    await transporter.sendMail(message);
+    return res.status(200).json({ "message": "check your email for OTP" });
+  } catch (error) {
+    return res.status(500).json({ 'error': 'could not get OTP for verification' });
+  }
+  // return res.redirect(`/api/auth/send-email?subject=verification`);
 }
 
 
@@ -127,7 +178,12 @@ const verifyOTP = async (req, res) => {
   if (!OTP || !email) return res.sendStatus(400);
   if (String(OTP) !== String(req.app.locals.OTP)) return res.sendStatus(400);
   try {
-    const user = await User.findOne({ 'local.email': email }).exec();
+    const user = await User.findOne({ 
+      $or: [
+        { 'local.email': email },
+        { 'google.email': email }
+      ]
+    }).exec();
     if (!user) return res.status(404).json({ 'error': 'user does not exist' });
     if (user.common.verified) {
       req.app.locals.OTP = null;

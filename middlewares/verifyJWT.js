@@ -1,5 +1,7 @@
 const jwt = require('jsonwebtoken');
 const dotenv = require('dotenv');
+const User = require('../models/user.model');
+
 
 dotenv.config();
 
@@ -12,9 +14,16 @@ const verifyJsonWebToken = (req, res, next) => {
   jwt.verify(
     accessToken,
     process.env.ACCESS_TOKEN,
-    (error, decoded) => {
+    async (error, decoded) => {
       if (error) return res.sendStatus(403);
-      req.user = { email: decoded.email, id: decoded._id };
+      req.user = { email: decoded.email, id: decoded.sub };
+      const user = await User.findOne({
+        $or: [
+          { 'local.email': decoded.email },
+          { 'google.email': decoded.email }
+        ]
+      }).exec();
+      if (!user.common.verified) return res.sendStatus(401);
       next();
     }
   );
