@@ -23,16 +23,14 @@ router.get('/', verifyJsonWebToken, (req, res) => {
 })
 
 router.post('/api/auth/create', register);
-router.route('/api/auth')
-            .post(login)
-            .get(logout);
-            
-router.get('/api/auth/refresh', refreshAccessToken);
-router.get('/api/auth/otp', generateOTP);
-router.post('/api/auth/verify-otp', verifyOTP);
-router.put('/api/auth/reset-password',resetPassword);
-router.get('/api/auth/reset-session',resetSession);
-router.post('/api/auth/send-email', emailRegistration);
+router.post('/api/auth/login', login);
+router.get('/api/auth/logout', verifyJsonWebToken, logout);            
+router.get('/api/auth/refresh', verifyJsonWebToken, refreshAccessToken);
+router.get('/api/auth/otp', verifyJsonWebToken, generateOTP);
+router.post('/api/auth/verify-otp', verifyJsonWebToken, verifyOTP);
+router.put('/api/auth/reset-password', verifyJsonWebToken, resetPassword);
+router.get('/api/auth/reset-session', verifyJsonWebToken, resetSession);
+// router.post('/api/auth/send-email', emailRegistration);
 
 
 router.get('/api/auth/google', passport.authenticate('google', {

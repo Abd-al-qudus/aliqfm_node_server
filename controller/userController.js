@@ -58,7 +58,7 @@ const login = async (req, res) => {
     if (!user) return res.sendStatus(403);
     const verified_pwd = await bcrypt.compare(password, user.local.password);
     if (!verified_pwd) return res.sendStatus(403)
-    const accessToken = generateJWTAccess({ email: user.local.email, id: user._id, duration: '1m' });
+    const accessToken = generateJWTAccess({ email: user.local.email, id: user._id, duration: '1h' });
     const refreshToken = generateJWTRefresh({ email: user.local.email, id: user._id, duration: '1d' });
     user.common.refreshToken = refreshToken;
     await user.save();
@@ -81,16 +81,19 @@ const logout = async (req, res) => {
   const cookies = req.cookies;
   if (!cookies?.jwt) return res.sendStatus(401);
   const refreshToken = cookies.jwt;
+  if (!refreshToken) return res.sendStatus(401);
   try {
     const user = await User.findOne({ 'common.refreshToken': refreshToken }).exec();
     if (!user) {
       res.clearCookie('jwt', { httpOnly: true });
       return res.sendStatus(403);
     }
-    user.common.refreshToken = '';
+    user.common.refreshToken = null;
     await user.save();
     res.clearCookie('jwt', { httpOnly: true });
-    return res.sendStatus(204)
+    delete req.session.user;
+    delete req.session.accessToken;
+    return res.status(204).json({  'message': 'logout successful' });
   } catch (error) {
     return res.status(500).json({
       status: 500,
@@ -115,7 +118,7 @@ const refreshAccessToken = async (req, res) => {
           if (err || user.local.email !== decoded.email) {
             return res.sendStatus(403);
           }
-          const accessToken = generateJWTAccess({ email: decoded.email, id: decoded._id, duration: '1m' });
+          const accessToken = generateJWTAccess({ email: decoded.email, id: decoded._id, duration: '1h' });
           return res.json({ accessToken });
       }
     );
@@ -150,6 +153,7 @@ const generateOTP = async (req, res) => {
   });
   try {
     const email = req.user ? req.user.email : req.query.email;
+    if (!email) return res.sendStatus(401);
     const mail = {
       body: {
       name: email,
@@ -169,12 +173,11 @@ const generateOTP = async (req, res) => {
   } catch (error) {
     return res.status(500).json({ 'error': 'could not get OTP for verification' });
   }
-  // return res.redirect(`/api/auth/send-email?subject=verification`);
 }
 
 
 const verifyOTP = async (req, res) => {
-  const { email, OTP } = req.query;
+  const { email, OTP } = req.body;
   if (!OTP || !email) return res.sendStatus(400);
   if (String(OTP) !== String(req.app.locals.OTP)) return res.sendStatus(400);
   try {
@@ -188,7 +191,7 @@ const verifyOTP = async (req, res) => {
     if (user.common.verified) {
       req.app.locals.OTP = null;
       req.app.locals.reset = true;
-      return res.status(400).json({ 'message': 'user already verified' });
+      return res.status(400).json({ 'message': 'OTP verified successfully' });
     }
     req.app.locals.OTP = null;
     req.app.locals.reset = true;
@@ -202,7 +205,7 @@ const verifyOTP = async (req, res) => {
 
 
 const resetPassword = async (req, res) => {
-  if (!req.app.locals.reset) return res.status(404).json({ 'error': 'auth session expired' });
+  if (!req.app.locals.reset) return res.status(404).json({ 'error': 'reset session expired' });
   const { email, newPassword} = req.body;
   if (!newPassword || !email) return res.status(400).json({ 'error': 'missing email or password' });
   if (typeof email !== "string") return res.status(400).json({error: "email must be a string"});
@@ -210,11 +213,11 @@ const resetPassword = async (req, res) => {
   try {
     const user = await User.findOne({ 'local.email': email }).exec();
     if (!user) return res.status(404).json({ 'error': 'user does not exist' });
-      const newpwd = await bcrypt.hash(newPassword, 10);
-      user.local.password = newpwd;
-      await user.save();
-      req.app.locals.reset = false;
-      return res.status(200).json({ 'message': 'user password changed' });
+    const newpwd = await bcrypt.hash(newPassword, 10);
+    user.local.password = newpwd;
+    await user.save();
+    req.app.locals.reset = false;
+    return res.status(200).json({ 'message': 'user password changed' });
   } catch (error) {
     return res.status(500).json({ error });
   }
