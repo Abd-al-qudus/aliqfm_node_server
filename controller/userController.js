@@ -240,4 +240,5 @@ module.exports = { register,
                     generateOTP, 
                     verifyOTP, 
                     resetPassword,
-                    resetSession };
+                    resetSession 
+                  };

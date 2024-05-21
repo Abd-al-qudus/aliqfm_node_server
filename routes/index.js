@@ -11,9 +11,18 @@ const { register,
         verifyOTP, 
         resetPassword,
         resetSession } = require('../controller/userController');
+const {
+        getQuestions,
+        getQuestion,
+        editQuestion,
+        postQuestion,
+        deleteQuestion
+      } = require("../controller/questionsController");
 
 
 const router = express.Router();
+
+// Authentication
 
 router.get('/', verifyJsonWebToken, (req, res) => {
   return res.status(200).json({
@@ -64,6 +73,15 @@ router.get('/api/auth/google/redirect/done', async (req, res) => {
       return res.sendStatus(400);
   }
 });
+
+
+// Questions
+router.get('/api/question', getQuestion);
+router.get('/api/questions', getQuestions);
+router.post('/api/question/create', postQuestion);
+router.put('/api/question', editQuestion);
+router.delete('/api/question', deleteQuestion);
+
 
 
 module.exports = router;
